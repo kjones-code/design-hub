@@ -65,10 +65,7 @@
   .btn-primary{font-size:13px;padding:8px 16px;border-radius:var(--radius-md);border:none;background:var(--brand-granite);color:#fff;cursor:pointer;font-weight:500;}
   .btn-primary:hover{background:var(--brand-dark);}
   .btn-cancel{font-size:13px;padding:8px 16px;border-radius:var(--radius-md);border:0.5px solid #ccc;background:transparent;color:#666;cursor:pointer;}
-  @media(max-width:600px){
-    .form-2col{grid-template-columns:1fr;}
-    .stats{grid-template-columns:repeat(3,1fr);}
-  }
+  @media(max-width:600px){.form-2col{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -93,14 +90,13 @@
     <button class="add-btn" onclick="toggleForm()">+ Add link</button>
   </div>
 
-  <!-- Add link form -->
   <div class="modal-wrap" id="form-wrap">
     <div class="modal">
       <h2>Add a new link</h2>
       <div class="form-2col">
         <div class="form-row">
           <label>Project name</label>
-          <input type="text" id="f-title" placeholder="e.g. Onboarding flow v3" />
+          <input type="text" id="f-title" placeholder="e.g. Stop sequence planner" />
         </div>
         <div class="form-row">
           <label>Link type</label>
@@ -121,7 +117,11 @@
         </div>
         <div class="form-row">
           <label>Category / flow</label>
-          <input type="text" id="f-category" placeholder="e.g. Onboarding, Dashboard" />
+          <select id="f-category">
+            <option value="Route Optimization">Route Optimization</option>
+            <option value="Chemical Tracking">Chemical Tracking</option>
+            <option value="Recurring Services">Recurring Services</option>
+          </select>
         </div>
       </div>
       <div class="form-row">
@@ -135,7 +135,6 @@
     </div>
   </div>
 
-  <!-- Airtable config form -->
   <div id="config-modal" class="modal-wrap">
     <div class="modal">
       <h2>Connect Airtable</h2>
@@ -175,41 +174,22 @@
   <div class="grid" id="grid"></div>
 
 </div>
-
 <script>
-const CAT_COLORS=[
-  {bg:'#C5D1EB',txt:'#1F2F16'},
-  {bg:'#E1F5EE',txt:'#085041'},
-  {bg:'#FAEEDA',txt:'#633806'},
-  {bg:'#FBEAF0',txt:'#72243E'},
-  {bg:'#EAF3DE',txt:'#27500A'},
-  {bg:'#FAECE7',txt:'#712B13'},
-  {bg:'#EEEDFE',txt:'#3C3489'},
-  {bg:'#E6F1FB',txt:'#0C447C'},
-];
-
-const catColorMap={};
-let catColorIdx=0;
-
-function getCatStyle(cat){
-  if(!catColorMap[cat]){
-    catColorMap[cat]=CAT_COLORS[catColorIdx%CAT_COLORS.length];
-    catColorIdx++;
-  }
-  return catColorMap[cat];
-}
+const CAT_COLORS={
+  'Route Optimization':{bg:'#C5D1EB',txt:'#1F2F16'},
+  'Chemical Tracking':{bg:'#FAEEDA',txt:'#633806'},
+  'Recurring Services':{bg:'#E1F5EE',txt:'#085041'},
+};
+function getCatStyle(cat){return CAT_COLORS[cat]||{bg:'#D3D1C7',txt:'#444441'};}
 
 const SAMPLE=[
-  {id:'s1',title:'Onboarding flow v3',type:'Figma Make',url:'https://figma.com',designer:'Sara R.',category:'Onboarding',desc:'Enterprise tier',date:'Apr 12'},
-  {id:'s2',title:'Dashboard redesign',type:'Prototype',url:'https://figma.com',designer:'Jamie K.',category:'Dashboard',desc:'Analytics · Q2 initiative',date:'Apr 10'},
-  {id:'s3',title:'Settings panel',type:'Figma Make',url:'https://figma.com',designer:'Mia L.',category:'Settings',desc:'Account settings · Mid-market',date:'Apr 8'},
-  {id:'s4',title:'Mobile checkout',type:'Prototype',url:'https://figma.com',designer:'Sara R.',category:'Checkout',desc:'SMB tier',date:'Apr 5'},
+  {id:'s1',title:'Stop sequence planner',type:'Figma Make',url:'https://figma.com',designer:'Sara R.',category:'Route Optimization',desc:'Enterprise tier',date:'Apr 12'},
+  {id:'s2',title:'Product usage log',type:'Prototype',url:'https://figma.com',designer:'Jamie K.',category:'Chemical Tracking',desc:'Compliance · Q2 initiative',date:'Apr 10'},
+  {id:'s3',title:'Service schedule builder',type:'Figma Make',url:'https://figma.com',designer:'Mia L.',category:'Recurring Services',desc:'Mid-market accounts',date:'Apr 8'},
+  {id:'s4',title:'Driver map view',type:'Prototype',url:'https://figma.com',designer:'Sara R.',category:'Route Optimization',desc:'Mobile · SMB tier',date:'Apr 5'},
 ];
 
-let links=[];
-let activeCat='All';
-let atConfig=null;
-let isLoading=false;
+let links=[],activeCat='All',atConfig=null,isLoading=false;
 
 function initials(n){return n.split(' ').map(p=>p[0]||'').join('').slice(0,2).toUpperCase();}
 function fmtDate(d){try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return d||'';}}
@@ -237,13 +217,9 @@ async function fetchFromAirtable(){
     const data=await r.json();
     if(data.records){
       links=data.records.map(rec=>({
-        id:rec.id,
-        title:rec.fields['Project name']||'',
-        type:rec.fields['Link type']||'Figma Make',
-        url:rec.fields['URL']||'',
-        designer:rec.fields['Designer']||'',
-        category:rec.fields['Category']||'General',
-        desc:rec.fields['Description']||'',
+        id:rec.id,title:rec.fields['Project name']||'',type:rec.fields['Link type']||'Figma Make',
+        url:rec.fields['URL']||'',designer:rec.fields['Designer']||'',
+        category:rec.fields['Category']||'Route Optimization',desc:rec.fields['Description']||'',
         date:fmtDate(rec.fields['Date']||''),
       }));
     }
@@ -254,23 +230,15 @@ async function fetchFromAirtable(){
 async function addToAirtable(link){
   if(!atConfig)return null;
   const r=await fetch(`https://api.airtable.com/v0/${atConfig.base}/${encodeURIComponent(atConfig.table)}`,{
-    method:'POST',
-    headers:{Authorization:`Bearer ${atConfig.token}`,'Content-Type':'application/json'},
-    body:JSON.stringify({fields:{
-      'Project name':link.title,'Link type':link.type,'URL':link.url,
-      'Designer':link.designer,'Category':link.category,
-      'Description':link.desc,'Date':new Date().toISOString().split('T')[0]
-    }})
+    method:'POST',headers:{Authorization:`Bearer ${atConfig.token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({fields:{'Project name':link.title,'Link type':link.type,'URL':link.url,'Designer':link.designer,'Category':link.category,'Description':link.desc,'Date':new Date().toISOString().split('T')[0]}})
   });
-  const data=await r.json();
-  return data.id||null;
+  const data=await r.json();return data.id||null;
 }
 
 async function deleteFromAirtable(id){
   if(!atConfig)return;
-  await fetch(`https://api.airtable.com/v0/${atConfig.base}/${encodeURIComponent(atConfig.table)}/${id}`,{
-    method:'DELETE',headers:{Authorization:`Bearer ${atConfig.token}`}
-  });
+  await fetch(`https://api.airtable.com/v0/${atConfig.base}/${encodeURIComponent(atConfig.table)}/${id}`,{method:'DELETE',headers:{Authorization:`Bearer ${atConfig.token}`}});
 }
 
 async function addLink(){
@@ -279,18 +247,12 @@ async function addLink(){
   const designer=document.getElementById('f-designer').value.trim();
   if(!title||!url||!designer){alert('Please fill in project name, URL, and designer.');return;}
   const date=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  const link={
-    id:'local-'+Date.now(),title,
-    type:document.getElementById('f-type').value,
-    url,designer,
-    category:document.getElementById('f-category').value.trim()||'General',
-    desc:document.getElementById('f-desc').value.trim(),
-    date
-  };
+  const link={id:'local-'+Date.now(),title,type:document.getElementById('f-type').value,url,designer,category:document.getElementById('f-category').value,desc:document.getElementById('f-desc').value.trim(),date};
   if(atConfig){const atId=await addToAirtable(link);if(atId)link.id=atId;}
   links.unshift(link);
   if(!atConfig)localStorage.setItem('pcdh-local-links',JSON.stringify(links));
-  ['f-title','f-url','f-designer','f-category','f-desc'].forEach(id=>document.getElementById(id).value='');
+  ['f-title','f-url','f-designer','f-desc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-category').selectedIndex=0;
   document.getElementById('form-wrap').classList.remove('open');
   render();
 }
@@ -307,10 +269,10 @@ function renderGrid(filtered){
   if(isLoading){g.innerHTML='<div class="loading">Loading from Airtable...</div>';return;}
   if(filtered.length===0){g.innerHTML='<div class="empty">No links found. Add one above.</div>';return;}
   g.innerHTML=filtered.map(l=>{
-    const cs=getCatStyle(l.category||'General');
+    const cs=getCatStyle(l.category);
     return `<div class="card">
       <div class="card-top">
-        <span style="font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;background:${cs.bg};color:${cs.txt}">${l.category||'General'}</span>
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;background:${cs.bg};color:${cs.txt}">${l.category}</span>
         <div style="display:flex;align-items:center;gap:6px;">
           <span style="font-size:11px;color:#999">${l.date||''}</span>
           <button class="del-btn" onclick="deleteLink('${l.id}')" title="Remove">&#x2715;</button>
@@ -335,8 +297,8 @@ function renderGrid(filtered){
 function render(){
   const q=document.getElementById('search').value.toLowerCase();
   const ft=document.getElementById('filter-type').value;
-  const cats=['All',...new Set(links.map(l=>l.category).filter(Boolean))];
-  document.getElementById('pill-row').innerHTML=cats.map(c=>{
+  const allCats=['All','Route Optimization','Chemical Tracking','Recurring Services'];
+  document.getElementById('pill-row').innerHTML=allCats.map(c=>{
     const cs=c==='All'?null:getCatStyle(c);
     const isActive=activeCat===c;
     const bg=isActive?(c==='All'?'#395B50':(cs?cs.bg:'#395B50')):'transparent';
@@ -344,7 +306,6 @@ function render(){
     const border=isActive?(c==='All'?'#395B50':(cs?cs.bg:'#395B50')):'#ccc';
     return `<button style="font-size:12px;padding:4px 12px;border-radius:20px;border:0.5px solid ${border};background:${bg};color:${txt};cursor:pointer;font-weight:${isActive?'500':'400'}" onclick="setCat('${c}')">${c}</button>`;
   }).join('');
-
   const filtered=links.filter(l=>{
     const mq=!q||l.title.toLowerCase().includes(q)||l.designer.toLowerCase().includes(q)||(l.category||'').toLowerCase().includes(q);
     const mt=!ft||l.type===ft;
@@ -352,7 +313,6 @@ function render(){
     return mq&&mt&&mc;
   });
   renderGrid(filtered);
-
   const makes=links.filter(l=>l.type==='Figma Make').length;
   const protos=links.filter(l=>l.type==='Prototype').length;
   document.getElementById('stats').innerHTML=`
@@ -365,10 +325,8 @@ function setCat(c){activeCat=c;render();}
 
 function init(){
   const saved=localStorage.getItem('pcdh-at-config');
-  if(saved){
-    atConfig=JSON.parse(saved);
-    fetchFromAirtable();
-  } else {
+  if(saved){atConfig=JSON.parse(saved);fetchFromAirtable();}
+  else{
     const local=localStorage.getItem('pcdh-local-links');
     links=local?JSON.parse(local):SAMPLE;
     document.getElementById('config-banner').style.display='block';
