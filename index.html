@@ -39,17 +39,23 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
   .card{background:#fff;border:0.5px solid #e0e0e0;border-radius:var(--radius-lg);padding:1rem 1.25rem;display:flex;flex-direction:column;gap:8px;}
   .card-top{display:flex;align-items:center;justify-content:space-between;}
+  .card-pills{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .card-actions{display:flex;align-items:center;gap:4px;flex-shrink:0;}
   .card-title{font-size:14px;font-weight:500;color:#1a1a1a;line-height:1.4;}
   .card-desc{font-size:12px;color:#666;line-height:1.5;}
-  .type-badge{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;display:inline-block;margin-top:4px;background:#D3D1C7;color:#444441;}
+  .type-badge{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;display:inline-block;background:#D3D1C7;color:#444441;}
   .card-footer{display:flex;align-items:center;justify-content:space-between;border-top:0.5px solid #eee;padding-top:10px;margin-top:auto;}
   .designer{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;}
   .avatar{width:22px;height:22px;border-radius:50%;background:var(--brand-granite);color:var(--brand-light);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;flex-shrink:0;}
   .designer-name{color:var(--brand-granite);}
+  .footer-right{display:flex;align-items:center;gap:8px;}
+  .date-label{font-size:11px;color:#999;}
   .open-btn{font-size:11px;color:var(--brand-slate);border:0.5px solid var(--brand-blue);border-radius:var(--radius-md);padding:4px 10px;text-decoration:none;cursor:pointer;background:transparent;}
   .open-btn:hover{background:var(--brand-light);color:var(--brand-dark);}
-  .del-btn{font-size:11px;color:#999;border:none;background:none;cursor:pointer;padding:2px 4px;opacity:0.4;line-height:1;}
-  .del-btn:hover{opacity:1;color:#c0392b;}
+  .icon-btn{font-size:13px;color:#999;border:none;background:none;cursor:pointer;padding:2px 5px;opacity:0.4;line-height:1;}
+  .icon-btn:hover{opacity:1;}
+  .icon-btn.del:hover{color:#c0392b;}
+  .icon-btn.edit:hover{color:var(--brand-slate);}
   .empty{text-align:center;padding:3rem 0;color:#999;font-size:14px;grid-column:1/-1;}
   .loading{text-align:center;padding:2rem;color:#999;font-size:13px;grid-column:1/-1;}
   .modal-wrap{display:none;margin-bottom:1.25rem;}
@@ -87,12 +93,14 @@
         <p>Figma Make + Prototype links for customer on-sites</p>
       </div>
     </div>
-    <button class="add-btn" onclick="toggleForm()">+ Add link</button>
+    <button class="add-btn" onclick="openForm()">+ Add link</button>
   </div>
 
+  <!-- Add / Edit form -->
   <div class="modal-wrap" id="form-wrap">
     <div class="modal">
-      <h2>Add a new link</h2>
+      <h2 id="form-title">Add a new link</h2>
+      <input type="hidden" id="f-id" value="" />
       <div class="form-2col">
         <div class="form-row">
           <label>Project name</label>
@@ -129,12 +137,13 @@
         <input type="text" id="f-desc" placeholder="e.g. Enterprise tier, Q2 initiative" />
       </div>
       <div class="form-actions">
-        <button class="btn-primary" onclick="addLink()">Save link</button>
-        <button class="btn-cancel" onclick="toggleForm()">Cancel</button>
+        <button class="btn-primary" id="form-submit-btn" onclick="submitForm()">Save link</button>
+        <button class="btn-cancel" onclick="closeForm()">Cancel</button>
       </div>
     </div>
   </div>
 
+  <!-- Airtable config -->
   <div id="config-modal" class="modal-wrap">
     <div class="modal">
       <h2>Connect Airtable</h2>
@@ -193,7 +202,33 @@ let links=[],activeCat='All',atConfig=null,isLoading=false;
 
 function initials(n){return n.split(' ').map(p=>p[0]||'').join('').slice(0,2).toUpperCase();}
 function fmtDate(d){try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return d||'';}}
-function toggleForm(){document.getElementById('form-wrap').classList.toggle('open');}
+
+function openForm(){
+  document.getElementById('form-title').textContent='Add a new link';
+  document.getElementById('form-submit-btn').textContent='Save link';
+  document.getElementById('f-id').value='';
+  ['f-title','f-url','f-designer','f-desc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-type').selectedIndex=0;
+  document.getElementById('f-category').selectedIndex=0;
+  document.getElementById('form-wrap').classList.add('open');
+}
+
+function openEditForm(id){
+  const l=links.find(x=>x.id===id);
+  if(!l)return;
+  document.getElementById('form-title').textContent='Edit link';
+  document.getElementById('form-submit-btn').textContent='Update link';
+  document.getElementById('f-id').value=l.id;
+  document.getElementById('f-title').value=l.title;
+  document.getElementById('f-url').value=l.url;
+  document.getElementById('f-designer').value=l.designer;
+  document.getElementById('f-desc').value=l.desc||'';
+  document.getElementById('f-type').value=l.type;
+  document.getElementById('f-category').value=l.category;
+  document.getElementById('form-wrap').classList.add('open');
+}
+
+function closeForm(){document.getElementById('form-wrap').classList.remove('open');}
 function showConfig(){document.getElementById('config-modal').classList.add('open');}
 function hideConfig(){document.getElementById('config-modal').classList.remove('open');}
 
@@ -236,25 +271,40 @@ async function addToAirtable(link){
   const data=await r.json();return data.id||null;
 }
 
+async function updateInAirtable(link){
+  if(!atConfig)return;
+  await fetch(`https://api.airtable.com/v0/${atConfig.base}/${encodeURIComponent(atConfig.table)}/${link.id}`,{
+    method:'PATCH',headers:{Authorization:`Bearer ${atConfig.token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({fields:{'Project name':link.title,'Link type':link.type,'URL':link.url,'Designer':link.designer,'Category':link.category,'Description':link.desc}})
+  });
+}
+
 async function deleteFromAirtable(id){
   if(!atConfig)return;
   await fetch(`https://api.airtable.com/v0/${atConfig.base}/${encodeURIComponent(atConfig.table)}/${id}`,{method:'DELETE',headers:{Authorization:`Bearer ${atConfig.token}`}});
 }
 
-async function addLink(){
+async function submitForm(){
   const title=document.getElementById('f-title').value.trim();
   const url=document.getElementById('f-url').value.trim();
   const designer=document.getElementById('f-designer').value.trim();
   if(!title||!url||!designer){alert('Please fill in project name, URL, and designer.');return;}
-  const date=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  const link={id:'local-'+Date.now(),title,type:document.getElementById('f-type').value,url,designer,category:document.getElementById('f-category').value,desc:document.getElementById('f-desc').value.trim(),date};
-  if(atConfig){const atId=await addToAirtable(link);if(atId)link.id=atId;}
-  links.unshift(link);
-  if(!atConfig)localStorage.setItem('pcdh-local-links',JSON.stringify(links));
-  ['f-title','f-url','f-designer','f-desc'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('f-category').selectedIndex=0;
-  document.getElementById('form-wrap').classList.remove('open');
-  render();
+  const editId=document.getElementById('f-id').value;
+  if(editId){
+    const idx=links.findIndex(l=>l.id===editId);
+    if(idx>-1){
+      links[idx]={...links[idx],title,url,designer,type:document.getElementById('f-type').value,category:document.getElementById('f-category').value,desc:document.getElementById('f-desc').value.trim()};
+      if(atConfig)await updateInAirtable(links[idx]);
+      if(!atConfig)localStorage.setItem('pcdh-local-links',JSON.stringify(links));
+    }
+  } else {
+    const date=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const link={id:'local-'+Date.now(),title,type:document.getElementById('f-type').value,url,designer,category:document.getElementById('f-category').value,desc:document.getElementById('f-desc').value.trim(),date};
+    if(atConfig){const atId=await addToAirtable(link);if(atId)link.id=atId;}
+    links.unshift(link);
+    if(!atConfig)localStorage.setItem('pcdh-local-links',JSON.stringify(links));
+  }
+  closeForm();render();
 }
 
 async function deleteLink(id){
@@ -272,23 +322,28 @@ function renderGrid(filtered){
     const cs=getCatStyle(l.category);
     return `<div class="card">
       <div class="card-top">
-        <span style="font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;background:${cs.bg};color:${cs.txt}">${l.category}</span>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <span style="font-size:11px;color:#999">${l.date||''}</span>
-          <button class="del-btn" onclick="deleteLink('${l.id}')" title="Remove">&#x2715;</button>
+        <div class="card-pills">
+          <span style="font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;background:${cs.bg};color:${cs.txt}">${l.category}</span>
+          <span class="type-badge">${l.type}</span>
+        </div>
+        <div class="card-actions">
+          <button class="icon-btn edit" onclick="openEditForm('${l.id}')" title="Edit">&#9998;</button>
+          <button class="icon-btn del" onclick="deleteLink('${l.id}')" title="Remove">&#x2715;</button>
         </div>
       </div>
       <div>
         <div class="card-title">${l.title}</div>
         ${l.desc?`<div class="card-desc">${l.desc}</div>`:''}
-        <span class="type-badge">${l.type}</span>
       </div>
       <div class="card-footer">
         <div class="designer">
           <div class="avatar">${initials(l.designer)}</div>
           <span class="designer-name">${l.designer}</span>
         </div>
-        <a class="open-btn" href="${l.url}" target="_blank">Open ↗</a>
+        <div class="footer-right">
+          <span class="date-label">${l.date||''}</span>
+          <a class="open-btn" href="${l.url}" target="_blank">Open ↗</a>
+        </div>
       </div>
     </div>`;
   }).join('');
