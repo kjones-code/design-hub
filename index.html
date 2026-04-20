@@ -27,7 +27,7 @@
   .add-btn:hover{background:rgba(255,255,255,0.18);}
   .config-banner{background:var(--brand-light);border:0.5px solid var(--brand-blue);border-radius:var(--radius-md);padding:0.75rem 1rem;margin-bottom:1.25rem;font-size:13px;color:var(--brand-dark);}
   .config-banner a{color:var(--brand-slate);cursor:pointer;text-decoration:underline;}
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.25rem;}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem;}
   .stat{background:var(--brand-light);border-radius:var(--radius-md);padding:0.75rem 1rem;}
   .stat-label{font-size:11px;color:var(--brand-slate);margin-bottom:4px;font-weight:500;}
   .stat-val{font-size:22px;font-weight:500;color:var(--brand-dark);}
@@ -71,7 +71,7 @@
   .btn-primary{font-size:13px;padding:8px 16px;border-radius:var(--radius-md);border:none;background:var(--brand-granite);color:#fff;cursor:pointer;font-weight:500;}
   .btn-primary:hover{background:var(--brand-dark);}
   .btn-cancel{font-size:13px;padding:8px 16px;border-radius:var(--radius-md);border:0.5px solid #ccc;background:transparent;color:#666;cursor:pointer;}
-  @media(max-width:600px){.form-2col{grid-template-columns:1fr;}}
+  @media(max-width:600px){.form-2col{grid-template-columns:1fr;}.stats{grid-template-columns:repeat(2,1fr);}}
 </style>
 </head>
 <body>
@@ -96,7 +96,6 @@
     <button class="add-btn" onclick="openForm()">+ Add link</button>
   </div>
 
-  <!-- Add / Edit form -->
   <div class="modal-wrap" id="form-wrap">
     <div class="modal">
       <h2 id="form-title">Add a new link</h2>
@@ -109,6 +108,7 @@
         <div class="form-row">
           <label>Link type</label>
           <select id="f-type">
+            <option value="Figma Designs">Figma Designs</option>
             <option value="Figma Make">Figma Make</option>
             <option value="Prototype">Prototype</option>
           </select>
@@ -126,9 +126,9 @@
         <div class="form-row">
           <label>Category / flow</label>
           <select id="f-category">
-            <option value="Route Optimization">Route Optimization</option>
             <option value="Chemical Tracking">Chemical Tracking</option>
             <option value="Recurring Services">Recurring Services</option>
+            <option value="Route Optimization">Route Optimization</option>
           </select>
         </div>
       </div>
@@ -143,7 +143,6 @@
     </div>
   </div>
 
-  <!-- Airtable config -->
   <div id="config-modal" class="modal-wrap">
     <div class="modal">
       <h2>Connect Airtable</h2>
@@ -174,6 +173,7 @@
     <input type="text" id="search" placeholder="Search projects, designers..." oninput="render()" />
     <select id="filter-type" onchange="render()">
       <option value="">All types</option>
+      <option value="Figma Designs">Figma Designs</option>
       <option value="Figma Make">Figma Make</option>
       <option value="Prototype">Prototype</option>
     </select>
@@ -185,17 +185,18 @@
 </div>
 <script>
 const CAT_COLORS={
-  'Route Optimization':{bg:'#C5D1EB',txt:'#1F2F16'},
   'Chemical Tracking':{bg:'#FAEEDA',txt:'#633806'},
   'Recurring Services':{bg:'#E1F5EE',txt:'#085041'},
+  'Route Optimization':{bg:'#C5D1EB',txt:'#1F2F16'},
 };
+const ALL_CATS=['Chemical Tracking','Recurring Services','Route Optimization'];
 function getCatStyle(cat){return CAT_COLORS[cat]||{bg:'#D3D1C7',txt:'#444441'};}
 
 const SAMPLE=[
   {id:'s1',title:'Stop sequence planner',type:'Figma Make',url:'https://figma.com',designer:'Sara R.',category:'Route Optimization',desc:'Enterprise tier',date:'Apr 12'},
-  {id:'s2',title:'Product usage log',type:'Prototype',url:'https://figma.com',designer:'Jamie K.',category:'Chemical Tracking',desc:'Compliance · Q2 initiative',date:'Apr 10'},
-  {id:'s3',title:'Service schedule builder',type:'Figma Make',url:'https://figma.com',designer:'Mia L.',category:'Recurring Services',desc:'Mid-market accounts',date:'Apr 8'},
-  {id:'s4',title:'Driver map view',type:'Prototype',url:'https://figma.com',designer:'Sara R.',category:'Route Optimization',desc:'Mobile · SMB tier',date:'Apr 5'},
+  {id:'s2',title:'Product usage log',type:'Figma Designs',url:'https://figma.com',designer:'Jamie K.',category:'Chemical Tracking',desc:'Compliance · Q2 initiative',date:'Apr 10'},
+  {id:'s3',title:'Service schedule builder',type:'Prototype',url:'https://figma.com',designer:'Mia L.',category:'Recurring Services',desc:'Mid-market accounts',date:'Apr 8'},
+  {id:'s4',title:'Driver map view',type:'Figma Make',url:'https://figma.com',designer:'Sara R.',category:'Route Optimization',desc:'Mobile · SMB tier',date:'Apr 5'},
 ];
 
 let links=[],activeCat='All',atConfig=null,isLoading=false;
@@ -252,9 +253,9 @@ async function fetchFromAirtable(){
     const data=await r.json();
     if(data.records){
       links=data.records.map(rec=>({
-        id:rec.id,title:rec.fields['Project name']||'',type:rec.fields['Link type']||'Figma Make',
+        id:rec.id,title:rec.fields['Project name']||'',type:rec.fields['Link type']||'Figma Designs',
         url:rec.fields['URL']||'',designer:rec.fields['Designer']||'',
-        category:rec.fields['Category']||'Route Optimization',desc:rec.fields['Description']||'',
+        category:rec.fields['Category']||'Chemical Tracking',desc:rec.fields['Description']||'',
         date:fmtDate(rec.fields['Date']||''),
       }));
     }
@@ -352,8 +353,7 @@ function renderGrid(filtered){
 function render(){
   const q=document.getElementById('search').value.toLowerCase();
   const ft=document.getElementById('filter-type').value;
-  const allCats=['All','Route Optimization','Chemical Tracking','Recurring Services'];
-  document.getElementById('pill-row').innerHTML=allCats.map(c=>{
+  document.getElementById('pill-row').innerHTML=['All',...ALL_CATS].map(c=>{
     const cs=c==='All'?null:getCatStyle(c);
     const isActive=activeCat===c;
     const bg=isActive?(c==='All'?'#395B50':(cs?cs.bg:'#395B50')):'transparent';
@@ -368,10 +368,12 @@ function render(){
     return mq&&mt&&mc;
   });
   renderGrid(filtered);
+  const designs=links.filter(l=>l.type==='Figma Designs').length;
   const makes=links.filter(l=>l.type==='Figma Make').length;
   const protos=links.filter(l=>l.type==='Prototype').length;
   document.getElementById('stats').innerHTML=`
     <div class="stat"><div class="stat-label">Total links</div><div class="stat-val">${links.length}</div></div>
+    <div class="stat"><div class="stat-label">Figma Designs</div><div class="stat-val">${designs}</div></div>
     <div class="stat"><div class="stat-label">Figma Make</div><div class="stat-val">${makes}</div></div>
     <div class="stat"><div class="stat-label">Prototypes</div><div class="stat-val">${protos}</div></div>`;
 }
