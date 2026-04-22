@@ -461,10 +461,11 @@ function render(){
     const ma=!fa||l.category===fa;
     return mq&&ma;
   });
-  const now=filtered.filter(l=>l.status==='Happening Now');
-  const soon=filtered.filter(l=>l.status==='Coming Soon');
-  const future=filtered.filter(l=>l.status==='Future');
-  const refs=filtered.filter(l=>l.status==='Reference');
+  const sortByArea=arr=>[...arr].sort((a,b)=>(a.category||'').localeCompare(b.category||''));
+  const now=sortByArea(filtered.filter(l=>l.status==='Happening Now'));
+  const soon=sortByArea(filtered.filter(l=>l.status==='Coming Soon'));
+  const future=sortByArea(filtered.filter(l=>l.status==='Future'));
+  const refs=sortByArea(filtered.filter(l=>l.status==='Reference'));
   document.getElementById('col-now').innerHTML=now.length?now.map(cardHTML).join(''):'<div class="empty-col">None yet</div>';
   document.getElementById('col-soon').innerHTML=soon.length?soon.map(cardHTML).join(''):'<div class="empty-col">None yet</div>';
   document.getElementById('col-future').innerHTML=future.length?future.map(cardHTML).join(''):'<div class="empty-col">None yet</div>';
